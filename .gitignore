@@ -1,0 +1,9 @@
+.cache/
+.direnv/
+
+build/
+result
+
+compile_commands.json
+nob
+nob.old
