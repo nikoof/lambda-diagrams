@@ -4,7 +4,7 @@
 
 #define BUILD_DIR "build/"
 
-const char *INPUTS[] = {"src/main.c", "src/parser.c"};
+const char *INPUTS[] = {"src/main.c", "src/parser.c", "src/util.c"};
 const size_t INPUTS_COUNT = sizeof(INPUTS) / sizeof(char *);
 const char *OUTPUT = BUILD_DIR "tromp";
 
@@ -17,6 +17,7 @@ void cflags(Nob_Cmd *cmd, bool debug) {
   nob_cmd_append(cmd, "-Iinclude");
 
   if (debug) {
+    nob_cmd_append(cmd, "-O0");
     nob_cmd_append(cmd, "-ggdb");
   } else {
     nob_cmd_append(cmd, "-O2");
@@ -43,7 +44,7 @@ Cli_Args parse_args(int argc, char **argv) {
     args.bear = args.bear || strcmp(arg, "bear") == 0;
     args.force = args.force || strcmp(arg, "force") == 0 || strcmp(arg, "f") == 0;
     args.run = args.run || strcmp(arg, "run") == 0;
-    args.debug = args.run || strcmp(arg, "debug") == 0;
+    args.debug = args.debug || strcmp(arg, "debug") == 0;
   }
 
   return args;
