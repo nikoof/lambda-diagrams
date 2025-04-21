@@ -1,7 +1,6 @@
 #include "parser.h"
 
 #include <assert.h>
-#include <raylib.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,30 +9,56 @@
 
 #include "util.h"
 
-bool tree_add_left_child(Arena *arena, Tree_Node *node) {
-  node->left = arena_alloc(arena, sizeof(Tree_Node));
-  if (node->left == NULL) {
-    fprintf(stderr, "Could not allocate %zu bytes for tree node. Full arena (%zu/%zu).\n", sizeof(Tree_Node),
-            arena->ptr, arena->capacity);
+typedef Pair(size_t, size_t) IndexPair;
+typedef Vec(IndexPair) VecIndexPair;
+
+Tree tree_new(void) {
+  Tree tree = {0};
+  nob_da_append(&tree.nodes, (Tree_Node){0});
+  tree.root = &tree.nodes.items[0];
+  return tree;
+}
+
+void tree_free(Tree tree) {
+  nob_da_free(tree.nodes);
+}
+
+bool tree_add_left_child(Tree *tree, Tree_Node *node) {
+  if (node->left != NULL) {
+    fprintf(stderr, "Left child of node " SV_Fmt " already exists.\n", SV_Arg(node->name));
     return false;
   }
 
-  memset(node->left, 0, sizeof(Tree_Node));
+  nob_da_append(&tree->nodes, (Tree_Node){0});
+  node->left = &tree->nodes.items[tree->nodes.count - 1];
   node->left->parent = node;
   return true;
 }
 
-bool tree_add_right_child(Arena *arena, Tree_Node *node) {
-  node->right = arena_alloc(arena, sizeof(Tree_Node));
-  if (node->right == NULL) {
-    fprintf(stderr, "Could not allocate %zu bytes for tree node. Full arena (%zu/%zu).\n", sizeof(Tree_Node),
-            arena->ptr, arena->capacity);
+bool tree_add_right_child(Tree *tree, Tree_Node *node) {
+  if (node->right != NULL) {
+    fprintf(stderr, "Right child of node " SV_Fmt " already exists.\n", SV_Arg(node->name));
     return false;
   }
 
-  memset(node->right, 0, sizeof(Tree_Node));
+  nob_da_append(&tree->nodes, (Tree_Node){0});
+  node->right = &tree->nodes.items[tree->nodes.count - 1];
   node->right->parent = node;
   return true;
+}
+
+bool compute_matching_parens(const char *term, VecIndexPair *pairs);
+bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
+                                 Tree_Node *node);
+
+bool tree_parse_lambda_term(Tree *tree, const char *term) {
+  VecIndexPair paren_pairs = {0};
+  if (!compute_matching_parens(term, &paren_pairs)) return false;
+
+  bool retval = tree_parse_lambda_term_impl(tree, paren_pairs, term, 0, strlen(term) - 1, tree->root);
+
+  nob_da_free(paren_pairs);
+  return retval;
 }
 
 void tree_print_graphviz(FILE *f, const Tree_Node *root) {
@@ -79,17 +104,16 @@ void tree_print_graphviz(FILE *f, const Tree_Node *root) {
   fprintf(f, "}\n");
 }
 
-typedef Pair(size_t, size_t) IndexPair;
-typedef Vec(IndexPair) VecIndexPair;
-bool compute_matching_parens(String_View term, VecIndexPair *pairs) {
+bool compute_matching_parens(const char *term, VecIndexPair *pairs) {
   Vec(size_t) stack = {0};
 
-  for (size_t i = 0; i < term.count; ++i) {
-    if (term.data[i] == '(') {
+  for (size_t i = 0; i < strlen(term); ++i) {
+    if (term[i] == '(') {
       nob_da_append(&stack, i);
-    } else if (term.data[i] == ')') {
+    } else if (term[i] == ')') {
       if (stack.count == 0) {
-        fprintf(stderr, "Unmatched ')' in " SV_Fmt "\n", SV_Arg(term));
+        fprintf(stderr, "Unmatched ')' in %s\n", term);
+        fprintf(stderr, "%*s^\n", 17 + (int)i, "");
         return false;
       }
       IndexPair p = {
@@ -101,7 +125,8 @@ bool compute_matching_parens(String_View term, VecIndexPair *pairs) {
   }
 
   if (stack.count != 0) {
-    fprintf(stderr, "Unmatched '(' in " SV_Fmt "\n", SV_Arg(term));
+    fprintf(stderr, "Unmatched '(' in %s\n", term);
+    fprintf(stderr, "%*s^\n", 17 + (int)stack.items[stack.count - 1], "");
     nob_da_free(stack);
     return false;
   }
@@ -129,63 +154,54 @@ size_t matching_left_paren(VecIndexPair pairs, size_t self) {
   return -1;
 }
 
-// TODO: Refactor this. Maybe using String_View is not ideal here. It is easier
-// to just precompute all the parenthesis pairs and use indices.
-bool tree_parse_lambda_term(Arena *arena, String_View term, Tree_Node *node) {
-  if (term.data == NULL || term.count == 0) {
+bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
+                                 Tree_Node *node) {
+  size_t len = r - l + 1;
+  if (term == NULL || len == 0) {
     node = NULL;
     return true;
   }
 
-  VecIndexPair paren_pairs = {0};
-  if (!compute_matching_parens(term, &paren_pairs)) return false;
-
-  if (term.data[0] == '(') {
-    if (matching_right_paren(paren_pairs, 0) == term.count - 1) {
-      sv_chop_left(&term, 1);
-      sv_chop_right(&term, 1);
-
-      paren_pairs.count = 0;
-      if (!compute_matching_parens(term, &paren_pairs)) return false;
+  if (term[l] == '(') {
+    if (matching_right_paren(paren_pairs, l) == r) {
+      l += 1;
+      r -= 1;
+      len -= 2;
     }
   }
 
-  node->name = term;
-  if (term.count == 1) {
+  node->name = sv_from_parts(term + l, len);
+  if (len == 1) {
     node->kind = LAMBDA_ATOM;
-  } else if (term.data[0] == 'l') {
+  } else if (term[l] == 'l') {
     node->kind = LAMBDA_ABSTRACTION;
 
-    String_View left = {0};
-    if (!sv_try_chop_by_delim(&term, '.', &left)) {
-      fprintf(stderr, "Could not parse lambda term. Unmatched 'l' in lambda abstraction in " SV_Fmt "\n",
-              SV_Arg(term));
+    size_t i = 0;
+    while (l + i < r && term[l + i] != '.') {
+      i += 1;
+    }
+
+    if (i >= len) {
+      fprintf(stderr, "Could not parse lambda term. Unmatched 'l' in lambda abstraction in %s\n", term);
+      fprintf(stderr, "%*s^", 68 + (int)l, "");
       return false;
     }
 
-    tree_add_left_child(arena, node);
-    tree_add_right_child(arena, node);
+    tree_add_left_child(tree, node);
+    tree_add_right_child(tree, node);
 
-    node->left->name = left;
-    if (!tree_parse_lambda_term(arena, term, node->right)) return false;
+    node->left->name = sv_from_parts(term + l, i - 1);
+    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l + i + 1, r, node->right)) return false;
   } else {
     node->kind = LAMBDA_APPLICATION;
 
-    String_View right = {0};
-    if (term.data[term.count - 1] == ')') {
-      size_t i = matching_left_paren(paren_pairs, term.count - 1);
-      right = sv_from_parts(term.data + i, term.count - i);
-    } else {
-      right = sv_from_parts(term.data + term.count - 1, 1);
-    }
-    String_View left = sv_from_parts(term.data, term.count - right.count);
+    size_t i = (term[r] == ')') ? matching_left_paren(paren_pairs, r) : r;
 
-    tree_add_left_child(arena, node);
-    tree_add_right_child(arena, node);
-    if (!tree_parse_lambda_term(arena, left, node->left)) return false;
-    if (!tree_parse_lambda_term(arena, right, node->right)) return false;
+    tree_add_left_child(tree, node);
+    tree_add_right_child(tree, node);
+    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l, i - 1, node->left)) return false;
+    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, i, r, node->right)) return false;
   }
 
-  nob_da_free(paren_pairs);
   return true;
 }

@@ -22,6 +22,16 @@ typedef struct Tree_Node {
   String_View name;
 } Tree_Node;
 
+typedef struct {
+  Vec(Tree_Node) nodes;
+  Tree_Node *root;
+} Tree;
+
+Tree tree_new(void);
+bool tree_parse_lambda_term(Tree *tree, const char *term);
+void tree_free(Tree tree);
+
+bool tree_add_right_child(Tree *tree, Tree_Node *node);
+bool tree_add_right_child(Tree *tree, Tree_Node *node);
+
 void tree_print_graphviz(FILE *stream, const Tree_Node *root);
-void tree_free(Tree_Node *root);
-bool tree_parse_lambda_term(Arena *arena, String_View term, Tree_Node *node);
