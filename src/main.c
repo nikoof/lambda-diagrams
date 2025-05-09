@@ -42,15 +42,15 @@ bool diagram_from_lambda_tree(Diagram *diagram, Tree *tree, Tree_Node *node, siz
         .kind = LAMBDA_ATOM,
     };
 
-    *curr_x -= 1;
+    *curr_x += 1;
 
     nob_da_append(&diagram->lines, line);
     node->user_data = &diagram->lines.items[diagram->lines.count - 1];
   } break;
   case LAMBDA_ABSTRACTION: {
     Line line_ = {
-        .start = {0, *curr_y},
-        .end = {*curr_x, *curr_y},
+        .start = {*curr_x, *curr_y},
+        .end = {1000, *curr_y},
         .orientation = LINE_HORIZONTAL,
         .kind = LAMBDA_ABSTRACTION,
     };
@@ -60,24 +60,29 @@ bool diagram_from_lambda_tree(Diagram *diagram, Tree *tree, Tree_Node *node, siz
     node->user_data = &diagram->lines.items[diagram->lines.count - 1];
     Line *line = node->user_data;
     diagram_from_lambda_tree(diagram, tree, node->right, curr_x, curr_y);
-    *curr_y -= 1; // FIXME: doesn't account for deeper abstractions in terms to the left
-    line->start.x = *curr_x + 1;
+    /* *curr_y -= 1; // FIXME: doesn't account for deeper abstractions in terms to the left */
+    line->end.x = *curr_x - 1;
   } break;
   case LAMBDA_APPLICATION: {
-    diagram_from_lambda_tree(diagram, tree, node->right, curr_x, curr_y);
     diagram_from_lambda_tree(diagram, tree, node->left, curr_x, curr_y);
+    diagram_from_lambda_tree(diagram, tree, node->right, curr_x, curr_y);
 
-    Tree_Node *bruh = node->right;
-    while (bruh->kind == LAMBDA_ABSTRACTION) {
-      bruh = bruh->right;
+    Tree_Node *left_expr_node = node->left;
+    while (left_expr_node->kind == LAMBDA_ABSTRACTION) {
+      left_expr_node = left_expr_node->right;
     }
-    Line *right = tree_get_leftmost_node(tree, bruh)->user_data;
-    assert(right != NULL);
+    Tree_Node *right_expr_node = node->right;
+    while (right_expr_node->kind == LAMBDA_ABSTRACTION) {
+      right_expr_node = right_expr_node->right;
+    }
+    Line *left = tree_get_leftmost_node(tree, left_expr_node)->user_data;
+    Line *right = tree_get_leftmost_node(tree, right_expr_node)->user_data;
+    assert(left != NULL && right != NULL);
 
     right->end.y = *curr_y;
 
     Line line_ = {
-        .start = {*curr_x + 1, *curr_y},
+        .start = {left->start.x, *curr_y},
         .end = right->end,
         .orientation = LINE_HORIZONTAL,
         .kind = LAMBDA_APPLICATION,
@@ -106,7 +111,7 @@ int main(int argc, char **argv) {
   tree_print_graphviz(tree_gv, tree.root);
 
   Diagram diagram = {0};
-  size_t x = 10, y = 0;
+  size_t x = 0, y = 0;
   if (!diagram_from_lambda_tree(&diagram, &tree, tree.root, &x, &y)) return 1;
   for (size_t i = 0; i < diagram.lines.count; ++i) {
     Line *line = &diagram.lines.items[i];
