@@ -47,6 +47,24 @@ bool tree_add_right_child(Tree *tree, Tree_Node *node) {
   return true;
 }
 
+Tree_Node *tree_get_leftmost_node(Tree *tree, Tree_Node *node) {
+  while (node != NULL) {
+    if (node->left == NULL) return node;
+    node = node->left;
+  }
+
+  return NULL;
+}
+
+Tree_Node *tree_get_rightmost_node(Tree *tree, Tree_Node *node) {
+  while (node != NULL) {
+    if (node->right == NULL) return node;
+    node = node->right;
+  }
+
+  return NULL;
+}
+
 bool compute_matching_parens(const char *term, VecIndexPair *pairs);
 bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
                                  Tree_Node *node, Tree_Node **variable_table);
@@ -101,9 +119,9 @@ void tree_print_graphviz(FILE *f, const Tree_Node *root) {
       fprintf(f, "\t%zu -- %zu\n", node->i, node->right->i);
     }
 
-    if (node->kind == LAMBDA_ATOM && node->binder != NULL) {
-      fprintf(f, "\t%zu -- %zu\n", node->i, node->binder->i);
-    }
+    /* if (node->kind == LAMBDA_ATOM && node->binder != NULL) { */
+    /*   fprintf(f, "\t%zu -- %zu\n", node->i, node->binder->i); */
+    /* } */
   }
   nob_da_free(queue);
 
