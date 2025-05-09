@@ -49,13 +49,15 @@ bool tree_add_right_child(Tree *tree, Tree_Node *node) {
 
 bool compute_matching_parens(const char *term, VecIndexPair *pairs);
 bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
-                                 Tree_Node *node);
+                                 Tree_Node *node, Tree_Node **variable_table);
 
 bool tree_parse_lambda_term(Tree *tree, const char *term) {
   VecIndexPair paren_pairs = {0};
   if (!compute_matching_parens(term, &paren_pairs)) return false;
+  Tree_Node *variable_table[256] = {0};
 
-  bool retval = tree_parse_lambda_term_impl(tree, paren_pairs, term, 0, strlen(term) - 1, tree->root);
+  bool retval =
+      tree_parse_lambda_term_impl(tree, paren_pairs, term, 0, strlen(term) - 1, tree->root, variable_table);
 
   nob_da_free(paren_pairs);
   return retval;
@@ -97,6 +99,10 @@ void tree_print_graphviz(FILE *f, const Tree_Node *root) {
     if (node->right != NULL) {
       nob_da_append(&queue, node->right);
       fprintf(f, "\t%zu -- %zu\n", node->i, node->right->i);
+    }
+
+    if (node->kind == LAMBDA_ATOM && node->binder != NULL) {
+      fprintf(f, "\t%zu -- %zu\n", node->i, node->binder->i);
     }
   }
   nob_da_free(queue);
@@ -155,7 +161,7 @@ size_t matching_left_paren(VecIndexPair pairs, size_t self) {
 }
 
 bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
-                                 Tree_Node *node) {
+                                 Tree_Node *node, Tree_Node **variable_table) {
   size_t len = r - l + 1;
   if (term == NULL || len == 0) {
     node = NULL;
@@ -173,6 +179,9 @@ bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const cha
   node->name = sv_from_parts(term + l, len);
   if (len == 1) {
     node->kind = LAMBDA_ATOM;
+    node->binder = variable_table[(size_t)*node->name.data];
+    assert(node->binder != NULL &&
+           "This atom's binder should have been recorded in the variable table before we got to it.");
   } else if (term[l] == 'l') {
     node->kind = LAMBDA_ABSTRACTION;
 
@@ -190,8 +199,11 @@ bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const cha
     tree_add_left_child(tree, node);
     tree_add_right_child(tree, node);
 
-    node->left->name = sv_from_parts(term + l, i - 1);
-    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l + i + 1, r, node->right)) return false;
+    node->left->name = sv_from_parts(term + l + 1, 1);
+    variable_table[(size_t)*node->left->name.data] = node;
+
+    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l + i + 1, r, node->right, variable_table))
+      return false;
   } else {
     node->kind = LAMBDA_APPLICATION;
 
@@ -199,8 +211,8 @@ bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const cha
 
     tree_add_left_child(tree, node);
     tree_add_right_child(tree, node);
-    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l, i - 1, node->left)) return false;
-    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, i, r, node->right)) return false;
+    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l, i - 1, node->left, variable_table)) return false;
+    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, i, r, node->right, variable_table)) return false;
   }
 
   return true;

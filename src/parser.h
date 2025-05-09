@@ -15,17 +15,22 @@ typedef struct Tree_Node {
   struct Tree_Node *parent;
   struct Tree_Node *left;
   struct Tree_Node *right;
+  struct Tree_Node *binder;
 
   size_t i;
 
   Lambda_Expr_Kind kind;
   String_View name;
+
+  void *user_data;
 } Tree_Node;
 
 typedef struct {
   Vec(Tree_Node) nodes;
   Tree_Node *root;
 } Tree;
+
+typedef Vec(Tree_Node *) Vec_Tree_Node;
 
 Tree tree_new(void);
 bool tree_parse_lambda_term(Tree *tree, const char *term);
