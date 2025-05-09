@@ -30,7 +30,7 @@
       };
     in rec {
       packages.default = pkgs.clangStdenv.mkDerivation {
-        name = "tromp-diagrams";
+        name = "lambda-diagrams";
         src = ./.;
 
         buildInputs = with pkgs; [
@@ -42,9 +42,14 @@
           nob
         ];
 
+        buildPhase = ''
+            cc -o nob nob.c
+            ./nob
+        '';
+
         installPhase = ''
           mkdir -p $out/bin/
-          cp tromp-diagrams $out/bin/
+          cp build/tromp $out/bin/lambda-diagrams
         '';
       };
 

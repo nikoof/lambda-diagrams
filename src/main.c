@@ -18,8 +18,8 @@ int main(int argc, char **argv) {
   /* const char *term = "ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x)"; */
   /* const char *term = "ln.lf.n(lc.la.lb.cb(lx.a(bx)))(lx.ly.x)(lx.x)f"; */
   /* const char *term = "ln.lf.lx.n(lg.lh.h(gf))(lu.x)(lu.u)"; */
-  /* const char *term = "lf.(lx.xx)(lx.f(xx))"; */
-  const char *term = "lf.(lx.xx)f";
+  const char *term = "lf.(lx.xx)(lx.f(xx))";
+  /* const char *term = "lf.(lx.xx)f"; */
 
   Tree tree = tree_new();
   if (!tree_parse_lambda_term(&tree, term)) return 1;
