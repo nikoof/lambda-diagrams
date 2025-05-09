@@ -54,13 +54,15 @@ bool diagram_from_lambda_tree(Diagram *diagram, Tree *tree, Tree_Node *node, siz
         .orientation = LINE_HORIZONTAL,
         .kind = LAMBDA_ABSTRACTION,
     };
-    *curr_y += 1;
 
     nob_da_append(&diagram->lines, line_);
     node->user_data = &diagram->lines.items[diagram->lines.count - 1];
     Line *line = node->user_data;
+
+    *curr_y += 1;
     diagram_from_lambda_tree(diagram, tree, node->right, curr_x, curr_y);
-    /* *curr_y -= 1; // FIXME: doesn't account for deeper abstractions in terms to the left */
+    *curr_y -= 1;
+
     line->end.x = *curr_x - 1;
   } break;
   case LAMBDA_APPLICATION: {
@@ -79,18 +81,26 @@ bool diagram_from_lambda_tree(Diagram *diagram, Tree *tree, Tree_Node *node, siz
     Line *right = tree_get_leftmost_node(tree, right_expr_node)->user_data;
     assert(left != NULL && right != NULL);
 
-    right->end.y = *curr_y;
+    size_t highest_y = 0;
+    for (size_t i = 0; i < diagram->lines.count; ++i) {
+      Line *line = &diagram->lines.items[i];
+      if (line->orientation == LINE_HORIZONTAL) {
+        if (line->start.y > highest_y && line->end.x >= left->start.x) {
+          highest_y = line->start.y;
+        }
+      }
+    }
+
+    right->end.y = highest_y + 1;
 
     Line line_ = {
-        .start = {left->start.x, *curr_y},
+        .start = {left->start.x, highest_y + 1},
         .end = right->end,
         .orientation = LINE_HORIZONTAL,
         .kind = LAMBDA_APPLICATION,
     };
     nob_da_append(&diagram->lines, line_);
     node->user_data = &diagram->lines.items[diagram->lines.count - 1];
-
-    *curr_y += 1;
   } break;
   }
 
@@ -98,10 +108,10 @@ bool diagram_from_lambda_tree(Diagram *diagram, Tree *tree, Tree_Node *node, siz
 }
 
 int main(int argc, char **argv) {
-  /* const char *term = "lf.lx.f(f(f(f(f(fx)))))"; */
+  const char *term = "lf.lx.f(f(f(f(f(fx)))))";
   /* const char *term = "(lx.xx)(lx.xx)"; */
   /* const char *term = "ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x)"; */
-  const char *term = "ln.lf.lx.n(lg.lh.h(gf))(lu.x)(lu.u)";
+  /* const char *term = "ln.lf.lx.n(lg.lh.h(gf))(lu.x)(lu.u)"; */
 
   Tree tree = tree_new();
   if (!tree_parse_lambda_term(&tree, term)) return 1;
