@@ -81,7 +81,7 @@ bool tree_parse_lambda_term(Tree *tree, const char *term) {
   return retval;
 }
 
-void tree_print_graphviz(FILE *f, const Tree_Node *root) {
+void tree_print_graphviz(FILE *f, const Tree_Node *root, bool include_binders) {
   fprintf(f, "strict graph {\n");
 
   Vec(Tree_Node *) queue = {0};
@@ -119,9 +119,9 @@ void tree_print_graphviz(FILE *f, const Tree_Node *root) {
       fprintf(f, "\t%zu -- %zu\n", node->i, node->right->i);
     }
 
-    /* if (node->kind == LAMBDA_ATOM && node->binder != NULL) { */
-    /*   fprintf(f, "\t%zu -- %zu\n", node->i, node->binder->i); */
-    /* } */
+    if (include_binders && node->kind == LAMBDA_ATOM && node->binder != NULL) {
+      fprintf(f, "\t%zu -- %zu\n", node->i, node->binder->i);
+    }
   }
   nob_da_free(queue);
 
@@ -218,6 +218,14 @@ bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const cha
     tree_add_right_child(tree, node);
 
     node->left->name = sv_from_parts(term + l + 1, 1);
+
+    // NOTE: This check does not allow to bind the same variable name multiple times in the same bound expression
+    // (but in disjoint abstractions).
+
+    /* if (variable_table[(size_t)*node->left->name.data] != 0) { */
+    /*   fprintf(stderr, "Variable '" SV_Fmt "' already bound.\n", SV_Arg(node->left->name)); */
+    /*   return false; */
+    /* } */
     variable_table[(size_t)*node->left->name.data] = node;
 
     if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l + i + 1, r, node->right, variable_table))

@@ -4,7 +4,7 @@
 
 #define BUILD_DIR "build/"
 
-const char *INPUTS[] = {"src/main.c", "src/parser.c", "src/util.c"};
+const char *INPUTS[] = {"src/main.c", "src/parser.c", "src/util.c", "src/diagram.c"};
 const size_t INPUTS_COUNT = sizeof(INPUTS) / sizeof(char *);
 const char *OUTPUT = BUILD_DIR "tromp";
 

@@ -22,7 +22,7 @@ typedef struct Tree_Node {
   Lambda_Expr_Kind kind;
   String_View name;
 
-  void *user_data;
+  void *line;
 } Tree_Node;
 
 typedef struct {
@@ -42,4 +42,4 @@ bool tree_add_right_child(Tree *tree, Tree_Node *node);
 Tree_Node *tree_get_leftmost_node(Tree *tree, Tree_Node *node);
 Tree_Node *tree_get_rightmost_node(Tree *tree, Tree_Node *node);
 
-void tree_print_graphviz(FILE *stream, const Tree_Node *root);
+void tree_print_graphviz(FILE *stream, const Tree_Node *root, bool include_binders);
