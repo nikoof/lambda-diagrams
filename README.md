@@ -16,5 +16,5 @@ nix build .#
 nix run .#
 ```
 
-> ![note]
+> [!NOTE]
 > Nix downloads its own `nob.h`.
