@@ -1,6 +1,8 @@
 #include "diagram.h"
 
 #include <nob.h>
+#include <raylib.h>
+#include <raymath.h>
 
 Tree_Node *get_leftmost_atom_node(Tree_Node *node) {
   while (node != NULL) {
@@ -132,4 +134,53 @@ void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node
     node->line = &diagram->items[diagram->count - 1];
   } break;
   }
+}
+
+RenderTexture2D diagram_to_raylib_texture(Diagram diagram, size_t width, size_t height, size_t line_width,
+                                          double serif_multiplier) {
+  RenderTexture2D texture = LoadRenderTexture(width, height);
+  size_t diagram_width = 0, diagram_height = 0;
+  for (size_t i = 0; i < diagram.count; ++i) {
+    if (diagram.items[i].orientation == LINE_HORIZONTAL) {
+      diagram_width = max(diagram_width, diagram.items[i].end.x);
+    }
+
+    if (diagram.items[i].orientation == LINE_VERTICAL) {
+      diagram_height = max(diagram_height, diagram.items[i].end.y);
+    }
+  }
+
+  const Vector2 scale = {
+      .x = roundf((float)width / (diagram_width + 1)),
+      .y = roundf((float)height / (diagram_height + 1)),
+  };
+
+  BeginTextureMode(texture);
+
+  for (size_t i = 0; i < diagram.count; ++i) {
+    Line *line = &diagram.items[i];
+
+    Vector2 start = {.x = line->start.x, .y = diagram_height - line->start.y};
+    Vector2 end = {.x = line->end.x, .y = diagram_height - line->end.y};
+
+    start = Vector2Multiply(start, scale);
+    end = Vector2Multiply(end, scale);
+
+    if (line->kind == LAMBDA_ABSTRACTION) {
+      start.x -= serif_multiplier * line_width;
+      end.x += serif_multiplier * line_width;
+    }
+
+    if (line->orientation == LINE_VERTICAL) {
+      end.y -= 0.5 * line_width;
+    }
+
+    start = Vector2Add(start, (Vector2){3.0 * line_width, 0.0});
+    end = Vector2Add(end, (Vector2){3.0 * line_width, 0.0});
+
+    DrawLineEx(start, end, line_width, WHITE);
+  }
+  EndTextureMode();
+
+  return texture;
 }
