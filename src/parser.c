@@ -155,6 +155,7 @@ bool compute_matching_parens(const char *term, VecIndexPair *pairs) {
     return false;
   }
 
+  nob_da_free(stack);
   return true;
 }
 
