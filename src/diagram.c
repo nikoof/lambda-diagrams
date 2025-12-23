@@ -23,7 +23,7 @@ void diagram_from_lambda_tree(Diagram *diagram, Tree *tree) {
   diagram_from_lambda_tree_impl(diagram, tree, tree->root, &breadth, &depth);
   Tree_Node *main_node = get_leftmost_atom_node(tree->root);
   assert(main_node != NULL && "Well-formed lambda tree should have leftmost atom node");
-  assert(main_node->line != NULL && "Node in complete diagram should have a corresponding line");
+  assert(main_node->user_data != NULL && "Node in complete diagram should have a corresponding line");
 
   size_t lowest_line_y = 0;
   for (size_t i = 0; i < diagram->count; ++i) {
@@ -34,7 +34,7 @@ void diagram_from_lambda_tree(Diagram *diagram, Tree *tree) {
       }
     }
   }
-  Line *main_line = main_node->line;
+  Line *main_line = main_node->user_data;
   main_line->end.y = lowest_line_y + 1;
 }
 
@@ -65,7 +65,7 @@ void diagram_from_lambda_tree(Diagram *diagram, Tree *tree) {
 void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node, size_t *breadth, size_t *depth) {
   switch (node->kind) {
   case LAMBDA_ATOM: {
-    Line *binder_line = node->binder->line;
+    Line *binder_line = node->binder->user_data;
     Line line = {
         .start = {*breadth, binder_line->start.y},
         .end = {*breadth, 1000},
@@ -76,7 +76,7 @@ void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node
     *breadth += 1;
 
     nob_da_append(diagram, line);
-    node->line = &diagram->items[diagram->count - 1];
+    node->user_data = &diagram->items[diagram->count - 1];
   } break;
   case LAMBDA_ABSTRACTION: {
     Line line_ = {
@@ -87,8 +87,8 @@ void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node
     };
 
     nob_da_append(diagram, line_);
-    node->line = &diagram->items[diagram->count - 1];
-    Line *line = node->line;
+    node->user_data = &diagram->items[diagram->count - 1];
+    Line *line = node->user_data;
 
     *depth += 1;
     diagram_from_lambda_tree_impl(diagram, tree, node->right, breadth, depth);
@@ -105,8 +105,8 @@ void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node
     assert(left_tree != NULL && right_tree != NULL &&
            "Subtree of well-formed lambda tree should have leftmost atom node");
 
-    Line *left = left_tree->line;
-    Line *right = right_tree->line;
+    Line *left = left_tree->user_data;
+    Line *right = right_tree->user_data;
     assert(left != NULL && right != NULL &&
            "Lines corresponding to these lambda atoms should have been set by now.");
 
@@ -131,7 +131,7 @@ void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node
         .kind = LAMBDA_APPLICATION,
     };
     nob_da_append(diagram, line);
-    node->line = &diagram->items[diagram->count - 1];
+    node->user_data = &diagram->items[diagram->count - 1];
   } break;
   }
 }

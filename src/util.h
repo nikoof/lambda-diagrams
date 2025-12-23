@@ -34,6 +34,8 @@
     U right;                                                                                                      \
   }
 
+size_t str_hash(const char* str);
+
 typedef struct {
   char *base;
   size_t ptr;

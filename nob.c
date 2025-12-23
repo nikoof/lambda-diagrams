@@ -14,6 +14,7 @@ void cc(Nob_Cmd *cmd) {
 
 void cflags(Nob_Cmd *cmd, bool debug) {
   nob_cmd_append(cmd, "-Wall", "-Wextra", "-Wpedantic");
+  nob_cmd_append(cmd, "-Wno-gnu-statement-expression-from-macro-expansion");
   nob_cmd_append(cmd, "-Iinclude");
 
   if (debug) {

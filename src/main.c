@@ -13,6 +13,8 @@
 #include <nob.h>
 
 int main(int argc, char **argv) {
+  (void)argc;
+  (void)argv;
   /* const char *term = "lf.lx.f(f(f(f(f(fx)))))"; */
   /* const char *term = "(lx.xx)(lx.xx)"; */
   /* const char *term = "ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x)"; */
@@ -24,7 +26,7 @@ int main(int argc, char **argv) {
   Tree tree = tree_new();
   if (!tree_parse_lambda_term(&tree, term)) return 1;
 
-  /* tree_print_graphviz(stdout, tree.root, false); */
+  tree_print_graphviz(stdout, tree.root, true);
 
   Diagram diagram = {0};
   diagram_from_lambda_tree(&diagram, &tree);

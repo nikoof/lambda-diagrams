@@ -12,22 +12,22 @@ typedef enum {
 } Lambda_Expr_Kind;
 
 typedef struct Tree_Node {
-  struct Tree_Node *parent;
   struct Tree_Node *left;
   struct Tree_Node *right;
+
+  // points to this atom's binder if kind == LAMBDA_ATOM, else NULL
   struct Tree_Node *binder;
 
-  size_t i;
-
   Lambda_Expr_Kind kind;
-  String_View name;
+  const char *name;
 
-  void *line;
+  void *user_data;
 } Tree_Node;
 
 typedef struct {
-  Vec(Tree_Node) nodes;
   Tree_Node *root;
+  Vec(Tree_Node) nodes; // order here should not matter
+  Vec(char) string_storage;
 } Tree;
 
 typedef Vec(Tree_Node *) Vec_Tree_Node;
