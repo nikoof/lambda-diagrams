@@ -13,6 +13,7 @@ typedef Pair(size_t, size_t) IndexPair;
 typedef Vec(IndexPair) VecIndexPair;
 
 void tree_free(Tree_Node *tree) {
+  if (tree == NULL) return;
   if (tree->left != NULL) tree_free(tree->left);
   if (tree->right != NULL) tree_free(tree->right);
   nob_sb_free(tree->name);
