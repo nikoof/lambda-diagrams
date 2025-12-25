@@ -250,6 +250,11 @@ bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, siz
 }
 
 void tree_node_label(Nob_String_Builder *sb, Tree_Node *node) {
+  if (node == NULL) {
+    nob_sb_append_cstr(sb, "nil");
+    return;
+  }
+
   switch (node->kind) {
   case LAMBDA_ATOM:
     nob_da_append(sb, node->atom);
@@ -267,6 +272,9 @@ void tree_node_label(Nob_String_Builder *sb, Tree_Node *node) {
     tree_node_label(sb, node->left);
     tree_node_label(sb, node->right);
     nob_da_append(sb, ')');
+    return;
+  default:
+    expect("enum Lambda_Expr_Kind");
     return;
   }
 }

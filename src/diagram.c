@@ -65,6 +65,8 @@ void diagram_from_lambda_tree(Diagram *diagram, Tree_Node *tree) {
 void diagram_from_lambda_tree_impl(Diagram *diagram, Tree_Node *node, size_t *breadth, size_t *depth) {
   switch (node->kind) {
   case LAMBDA_ATOM: {
+    assert(node != NULL);
+    assert(node->binder != NULL);
     Line *binder_line = node->binder->user_data;
     Line line = {
         .start = {*breadth, binder_line->start.y},
@@ -136,9 +138,9 @@ void diagram_from_lambda_tree_impl(Diagram *diagram, Tree_Node *node, size_t *br
   }
 }
 
-RenderTexture2D diagram_to_raylib_texture(Diagram diagram, size_t width, size_t height, size_t line_width,
-                                          double serif_multiplier) {
-  RenderTexture2D texture = LoadRenderTexture(width, height);
+void diagram_to_raylib_texture(RenderTexture2D texture, Diagram diagram, size_t line_width, double serif_multiplier) {
+  size_t width = texture.texture.width;
+  size_t height = texture.texture.height;
   size_t diagram_width = 0, diagram_height = 0;
   for (size_t i = 0; i < diagram.count; ++i) {
     if (diagram.items[i].orientation == LINE_HORIZONTAL) {
@@ -156,6 +158,7 @@ RenderTexture2D diagram_to_raylib_texture(Diagram diagram, size_t width, size_t 
   };
 
   BeginTextureMode(texture);
+  ClearBackground(BLACK);
 
   for (size_t i = 0; i < diagram.count; ++i) {
     Line *line = &diagram.items[i];
@@ -181,6 +184,52 @@ RenderTexture2D diagram_to_raylib_texture(Diagram diagram, size_t width, size_t 
     DrawLineEx(start, end, line_width, WHITE);
   }
   EndTextureMode();
+}
 
-  return texture;
+void diagram_to_raylib_window(Diagram diagram, size_t line_width, double serif_multiplier) {
+  size_t width = GetRenderWidth();
+  size_t height = GetRenderHeight();
+  size_t diagram_width = 0, diagram_height = 0;
+  for (size_t i = 0; i < diagram.count; ++i) {
+    if (diagram.items[i].orientation == LINE_HORIZONTAL) {
+      diagram_width = max(diagram_width, diagram.items[i].end.x);
+    }
+
+    if (diagram.items[i].orientation == LINE_VERTICAL) {
+      diagram_height = max(diagram_height, diagram.items[i].end.y);
+    }
+  }
+
+  const Vector2 scale = {
+      .x = roundf((float)width / (diagram_width + 1)),
+      .y = roundf((float)height / (diagram_height + 1)),
+  };
+
+  BeginDrawing();
+  ClearBackground(BLACK);
+
+  for (size_t i = 0; i < diagram.count; ++i) {
+    Line *line = &diagram.items[i];
+
+    Vector2 start = {.x = line->start.x, .y = diagram_height - line->start.y};
+    Vector2 end = {.x = line->end.x, .y = diagram_height - line->end.y};
+
+    start = Vector2Multiply(start, scale);
+    end = Vector2Multiply(end, scale);
+
+    if (line->kind == LAMBDA_ABSTRACTION) {
+      start.x -= serif_multiplier * line_width;
+      end.x += serif_multiplier * line_width;
+    }
+
+    if (line->orientation == LINE_VERTICAL) {
+      end.y -= 0.5 * line_width;
+    }
+
+    start = Vector2Add(start, (Vector2){3.0 * line_width, 0.0});
+    end = Vector2Add(end, (Vector2){3.0 * line_width, 0.0});
+
+    DrawLineEx(start, end, line_width, WHITE);
+  }
+  EndDrawing();
 }

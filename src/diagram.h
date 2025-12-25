@@ -27,5 +27,5 @@ typedef Vec(Line) Diagram;
 
 void diagram_from_lambda_tree(Diagram *diagram, Tree_Node *tree);
 
-RenderTexture2D diagram_to_raylib_texture(Diagram diagram, size_t width, size_t height, size_t line_width,
-                                          double serif_multiplier);
+void diagram_to_raylib_texture(RenderTexture2D texture, Diagram diagram, size_t line_width, double serif_multiplier);
+void diagram_to_raylib_window(Diagram diagram, size_t line_width, double serif_multiplier);

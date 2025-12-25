@@ -38,10 +38,10 @@ bool tree_copy_subtree_to_node(Tree_Node *dst, Tree_Node *src) {
     Node_Pair curr = stack.items[--stack.count];
 
     if (curr.src->kind == LAMBDA_ABSTRACTION) {
-      Nob_String_Builder sb = {0};
-      tree_node_label(&sb, curr.src);
-      printf("binder_lookup[%c] = "SB_Fmt"\n", curr.src->left->atom, SB_Arg(sb));
-      nob_sb_free(sb);
+      // Nob_String_Builder sb = {0};
+      // tree_node_label(&sb, curr.src);
+      // printf("binder_lookup[%c] = "SB_Fmt"\n", curr.src->left->atom, SB_Arg(sb));
+      // nob_sb_free(sb);
 
       binder_lookup[(size_t)curr.src->left->atom] = curr.dst;
     };
@@ -49,7 +49,9 @@ bool tree_copy_subtree_to_node(Tree_Node *dst, Tree_Node *src) {
 
     // this is a copy
     curr.dst->kind      = curr.src->kind;
-    curr.dst->binder    = curr.src->kind == LAMBDA_ATOM ? binder_lookup[(size_t)curr.src->atom] : 0;
+    curr.dst->binder    = (curr.src->kind == LAMBDA_ATOM && binder_lookup[(size_t)curr.src->atom] != NULL)
+                            ? binder_lookup[(size_t)curr.src->atom]
+                            : curr.src->binder;
     curr.dst->atom      = curr.src->atom;
     curr.dst->user_data = curr.src->user_data;
 
@@ -103,18 +105,22 @@ bool beta_reduce(Tree_Node *node, bool *reducible) {
   }
   stack.count = 0;
 
+  Nob_String_Builder sb = {0};
   nob_da_foreach(Tree_Node*, atom, &atoms) {
     if (*atom == node->left->left) continue;
+    if ((*atom)->atom == node->left->left->atom) {
+      sb.count = 0;
+      tree_node_label(&sb, node->right);
+      printf("copy "SB_Fmt" to ", SB_Arg(sb));
+      sb.count = 0;
+      tree_node_label(&sb, *atom);
+      printf(SB_Fmt"\n", SB_Arg(sb));
 
-    Nob_String_Builder sb = {0};
-    tree_node_label(&sb, node->right);
-    printf("COPY "SB_Fmt" to ", SB_Arg(sb));
-    sb.count = 0;
-    tree_node_label(&sb, node);
-    printf(SB_Fmt"\n", SB_Arg(sb));
-
-    if (!tree_copy_subtree_to_node(*atom, node->right)) return false;
+      if (!tree_copy_subtree_to_node(*atom, node->right)) return false;
+    }
   }
+
+  nob_sb_free(sb);
 
   tree_free(node->right);
   node->right = NULL;
@@ -133,46 +139,54 @@ int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
   // const char *term = "lf.lx.f(f(f(f(f(fx)))))";
-  // const char *term = "(lx.xxx)(ly.y)";
+  const char *term = "ly.(lf.lx.f(f(f(f(f(fx))))))y";
+  // const char *term = "(lx.xx)(lx.xx)";
+  // const char *term = "(ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x))(lf.lx.f(f(f(x))))";
   // const char *term = "(lf.lg.lx.(ly.y)x)(lz.z)";
   // const char *term = "ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x)";
   // const char *term = "ln.lf.n(lc.la.lb.cb(lx.a(bx)))(lx.ly.x)(lx.x)f";
   // const char *term = "ln.lf.lx.n(lg.lh.h(gf))(lu.x)(lu.u)";
   // const char *term = "lf.(lx.xx)(lx.f(xx))";
-  const char *term = "lf.(lx.xx)f";
+  // const char *term = "lf.(lx.xx)f";
 
   Tree_Node *tree = calloc(1, sizeof(Tree_Node));
   assert(tree != NULL);
   if (!tree_parse_lambda_term(tree, term)) return 1;
 
-  tree_print_graphviz(stdout, tree, true);
-  bool reducible;
-  if (!beta_reduce(tree, &reducible)) return 1;
-  if (!reducible) printf("IRREDUCIBLE!\n");
+  // tree_print_graphviz(stdout, tree, true);
+  // bool reducible;
+  // if (!beta_reduce(tree, &reducible)) return 1;
+  // if (!reducible) printf("IRREDUCIBLE!\n");
   tree_print_graphviz(stdout, tree, true);
 
+  SetTraceLogLevel(LOG_ERROR);
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "Lambda Diagrams");
 
-  // Diagram diagram = {0};
-  // diagram_from_lambda_tree(&diagram, tree);
-  //
-  // SetTraceLogLevel(LOG_ERROR);
-  // SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-  // InitWindow(800, 600, "Lambda Diagrams");
-  //
-  // RenderTexture2D diagram_tex = diagram_to_raylib_texture(diagram, 300, 200, 6, 5.0);
-  //
-  // while (!WindowShouldClose()) {
-  //   BeginDrawing();
-  //   ClearBackground(BLACK);
-  //
-  //   DrawTexture(diagram_tex.texture, 50, 50, WHITE);
-  //
-  //   EndDrawing();
-  // }
-  //
-  // CloseWindow();
-  //
-  // nob_da_free(diagram);
+  bool reducible = true;
+  Diagram diagram = {0};
+  RenderTexture2D texture = LoadRenderTexture(800, 600);
+  diagram_from_lambda_tree(&diagram, tree);
+  diagram_to_raylib_texture(texture, diagram, 1, 0.0);
+  while (!WindowShouldClose()) {
+    BeginDrawing();
+    ClearBackground(BLACK);
+    DrawTexture(texture.texture, 50, 50, WHITE);
+    EndDrawing();
+
+    if (IsKeyPressed(KEY_SPACE)) {
+      if (reducible) { beta_reduce(tree, &reducible); }
+      diagram.count = 0;
+      tree_print_graphviz(stdout, tree, true);
+      diagram_from_lambda_tree(&diagram, tree);
+      diagram_to_raylib_texture(texture, diagram, 1, 0.0);
+    }
+
+  }
+
+  CloseWindow();
+
+  nob_da_free(diagram);
   tree_free(tree);
   return 0;
 }
