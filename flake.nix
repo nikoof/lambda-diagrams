@@ -55,7 +55,7 @@
 
       devShell = pkgs.mkShell {
         inputsFrom = [ packages.default ];
-        packages = with pkgs; [ clang-tools_19 clang gdb ];
+        packages = with pkgs; [ clang-tools_19 clang gdb valgrind ];
       };
     }
   );

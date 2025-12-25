@@ -34,6 +34,9 @@
     U right;                                                                                                      \
   }
 
+#define SB_Fmt     "%.*s"
+#define SB_Arg(sv) (int)(sv).count, (sv).items
+
 size_t str_hash(const char* str);
 
 typedef struct {

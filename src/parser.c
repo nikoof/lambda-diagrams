@@ -12,47 +12,34 @@
 typedef Pair(size_t, size_t) IndexPair;
 typedef Vec(IndexPair) VecIndexPair;
 
-static inline void set_name(Tree *tree, Tree_Node *node, const char* name, size_t len) {
-  node->name = tree->string_storage.items + tree->string_storage.count;
-  nob_da_append_many(&tree->string_storage, name, len);
-  nob_da_append(&tree->string_storage, 0);
+void tree_free(Tree_Node *tree) {
+  if (tree->left != NULL) tree_free(tree->left);
+  if (tree->right != NULL) tree_free(tree->right);
+  nob_sb_free(tree->name);
+  free(tree);
 }
 
-Tree tree_new(void) {
-  Tree tree = {0};
-  nob_da_append(&tree.nodes, (Tree_Node){0});
-  tree.root = &tree.nodes.items[0];
-  return tree;
-}
-
-void tree_free(Tree tree) {
-  nob_da_free(tree.nodes);
-  nob_da_free(tree.string_storage);
-}
-
-bool tree_add_left_child(Tree *tree, Tree_Node *node) {
+bool tree_add_left_child(Tree_Node *node) {
   if (node->left != NULL) {
-    fprintf(stderr, "Left child of node %s already exists.\n",node->name);
+    fprintf(stderr, "Left child of node " SB_Fmt " already exists.\n", SB_Arg(node->name));
     return false;
   }
 
-  nob_da_append(&tree->nodes, (Tree_Node){0});
-  node->left = &tree->nodes.items[tree->nodes.count - 1];
-  return true;
+  node->left = calloc(1, sizeof(Tree_Node));
+  return node->left != NULL;
 }
 
-bool tree_add_right_child(Tree *tree, Tree_Node *node) {
+bool tree_add_right_child(Tree_Node *node) {
   if (node->right != NULL) {
-    fprintf(stderr, "Right child of node %s already exists.\n", node->name);
+    fprintf(stderr, "Right child of node " SB_Fmt " already exists.\n", SB_Arg(node->name));
     return false;
   }
 
-  nob_da_append(&tree->nodes, (Tree_Node){0});
-  node->right = &tree->nodes.items[tree->nodes.count - 1];
-  return true;
+  node->right = calloc(1, sizeof(Tree_Node));
+  return node->right != NULL;
 }
 
-Tree_Node *tree_get_leftmost_node(Tree *tree, Tree_Node *node) {
+Tree_Node *tree_get_leftmost_node(Tree_Node *node) {
   while (node != NULL) {
     if (node->left == NULL) return node;
     node = node->left;
@@ -61,7 +48,7 @@ Tree_Node *tree_get_leftmost_node(Tree *tree, Tree_Node *node) {
   return NULL;
 }
 
-Tree_Node *tree_get_rightmost_node(Tree *tree, Tree_Node *node) {
+Tree_Node *tree_get_rightmost_node(Tree_Node *node) {
   while (node != NULL) {
     if (node->right == NULL) return node;
     node = node->right;
@@ -71,18 +58,15 @@ Tree_Node *tree_get_rightmost_node(Tree *tree, Tree_Node *node) {
 }
 
 bool compute_matching_parens(const char *term, VecIndexPair *pairs);
-bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
+bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
                                  Tree_Node *node, Tree_Node **variable_table);
 
-bool tree_parse_lambda_term(Tree *tree, const char *term) {
+bool tree_parse_lambda_term(Tree_Node *tree, const char *term) {
   VecIndexPair paren_pairs = {0};
   if (!compute_matching_parens(term, &paren_pairs)) return false;
   Tree_Node *variable_table[256] = {0};
 
-  bool retval =
-      tree_parse_lambda_term_impl(tree, paren_pairs, term, 0, strlen(term) - 1, tree->root, variable_table);
-
-  set_name(tree, tree->root, term, strlen(term));
+  bool retval = tree_parse_lambda_term_impl(paren_pairs, term, 0, strlen(term) - 1, tree, variable_table);
 
   nob_da_free(paren_pairs);
   return retval;
@@ -91,15 +75,15 @@ bool tree_parse_lambda_term(Tree *tree, const char *term) {
 void tree_print_graphviz(FILE *f, const Tree_Node *root, bool include_binders) {
   fprintf(f, "strict graph {\n");
 
-  Vec(Tree_Node *) queue = {0};
-  nob_da_append(&queue, (Tree_Node *)root);
+  Vec(Tree_Node*) queue = {0};
+  nob_da_append(&queue, (Tree_Node*)root);
 
   size_t i = 0;
   while (i < queue.count && root != NULL) {
     Tree_Node *node = queue.items[i++];
 
     node->user_data = (void*)i;
-    fprintf(f, "\t%zu [label=\"%s\"]\n", (size_t)node->user_data, node->name);
+    fprintf(f, "\t%zu [label=\"" SB_Fmt "\"]\n", (size_t)node->user_data, SB_Arg(node->name));
 
     if (node->left != NULL) {
       nob_da_append(&queue, node->left);
@@ -186,7 +170,7 @@ size_t matching_left_paren(VecIndexPair pairs, size_t self) {
   return -1;
 }
 
-bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
+bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
                                  Tree_Node *node, Tree_Node **variable_table) {
   size_t len = r - l + 1;
   if (term == NULL || len == 0) {
@@ -202,10 +186,10 @@ bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const cha
     }
   }
 
-  set_name(tree, node, term + l, len);
+  nob_da_append_many(&node->name, term + l, len);
   if (len == 1) {
     node->kind = LAMBDA_ATOM;
-    node->binder = variable_table[(size_t)*node->name];
+    node->binder = variable_table[(size_t)*node->name.items];
     assert(node->binder != NULL &&
            "This atom's binder should have been recorded in the variable table before we got to it.");
   } else if (term[l] == 'l') {
@@ -222,10 +206,11 @@ bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const cha
       return false;
     }
 
-    tree_add_left_child(tree, node);
-    tree_add_right_child(tree, node);
+    if (!tree_add_left_child(node)) return false;
+    if (!tree_add_right_child(node)) return false;
 
-    set_name(tree, node->left, term + l + 1, 1);
+    // set_name(tree, node->left, term + l + 1, 1);
+    nob_da_append_many(&node->left->name, term + l + 1, 1);
 
     // NOTE: This check does not allow to bind the same variable name multiple times in the same bound expression
     // (but in disjoint abstractions).
@@ -234,19 +219,19 @@ bool tree_parse_lambda_term_impl(Tree *tree, VecIndexPair paren_pairs, const cha
     /*   fprintf(stderr, "Variable '" SV_Fmt "' already bound.\n", SV_Arg(node->left->name)); */
     /*   return false; */
     /* } */
-    variable_table[(size_t)*node->left->name] = node;
+    variable_table[(size_t)*node->left->name.items] = node;
 
-    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l + i + 1, r, node->right, variable_table))
+    if (!tree_parse_lambda_term_impl(paren_pairs, term, l + i + 1, r, node->right, variable_table))
       return false;
   } else {
     node->kind = LAMBDA_APPLICATION;
 
     size_t i = (term[r] == ')') ? matching_left_paren(paren_pairs, r) : r;
 
-    tree_add_left_child(tree, node);
-    tree_add_right_child(tree, node);
-    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, l, i - 1, node->left, variable_table)) return false;
-    if (!tree_parse_lambda_term_impl(tree, paren_pairs, term, i, r, node->right, variable_table)) return false;
+    if (!tree_add_left_child(node)) return false;
+    if (!tree_add_right_child(node)) return false;
+    if (!tree_parse_lambda_term_impl(paren_pairs, term, l, i - 1, node->left, variable_table)) return false;
+    if (!tree_parse_lambda_term_impl(paren_pairs, term, i, r, node->right, variable_table)) return false;
   }
 
   return true;

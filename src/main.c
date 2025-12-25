@@ -23,13 +23,14 @@ int main(int argc, char **argv) {
   /* const char *term = "lf.(lx.xx)(lx.f(xx))"; */
   /* const char *term = "lf.(lx.xx)f"; */
 
-  Tree tree = tree_new();
-  if (!tree_parse_lambda_term(&tree, term)) return 1;
+  Tree_Node *tree = calloc(1, sizeof(Tree_Node));
+  assert(tree != NULL);
+  if (!tree_parse_lambda_term(tree, term)) return 1;
 
-  tree_print_graphviz(stdout, tree.root, true);
+  tree_print_graphviz(stdout, tree, true);
 
   Diagram diagram = {0};
-  diagram_from_lambda_tree(&diagram, &tree);
+  diagram_from_lambda_tree(&diagram, tree);
 
   SetTraceLogLevel(LOG_ERROR);
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);

@@ -17,11 +17,11 @@ Tree_Node *get_leftmost_atom_node(Tree_Node *node) {
   return NULL;
 }
 
-void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node, size_t *breadth, size_t *depth);
-void diagram_from_lambda_tree(Diagram *diagram, Tree *tree) {
+void diagram_from_lambda_tree_impl(Diagram *diagram, Tree_Node *node, size_t *breadth, size_t *depth);
+void diagram_from_lambda_tree(Diagram *diagram, Tree_Node *tree) {
   size_t breadth = 0, depth = 0;
-  diagram_from_lambda_tree_impl(diagram, tree, tree->root, &breadth, &depth);
-  Tree_Node *main_node = get_leftmost_atom_node(tree->root);
+  diagram_from_lambda_tree_impl(diagram, tree, &breadth, &depth);
+  Tree_Node *main_node = get_leftmost_atom_node(tree);
   assert(main_node != NULL && "Well-formed lambda tree should have leftmost atom node");
   assert(main_node->user_data != NULL && "Node in complete diagram should have a corresponding line");
 
@@ -62,7 +62,7 @@ void diagram_from_lambda_tree(Diagram *diagram, Tree *tree) {
  *
  * There are probably more elegant ways to do this.
  */
-void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node, size_t *breadth, size_t *depth) {
+void diagram_from_lambda_tree_impl(Diagram *diagram, Tree_Node *node, size_t *breadth, size_t *depth) {
   switch (node->kind) {
   case LAMBDA_ATOM: {
     Line *binder_line = node->binder->user_data;
@@ -91,14 +91,14 @@ void diagram_from_lambda_tree_impl(Diagram *diagram, Tree *tree, Tree_Node *node
     Line *line = node->user_data;
 
     *depth += 1;
-    diagram_from_lambda_tree_impl(diagram, tree, node->right, breadth, depth);
+    diagram_from_lambda_tree_impl(diagram, node->right, breadth, depth);
     *depth -= 1;
 
     line->end.x = *breadth - 1;
   } break;
   case LAMBDA_APPLICATION: {
-    diagram_from_lambda_tree_impl(diagram, tree, node->left, breadth, depth);
-    diagram_from_lambda_tree_impl(diagram, tree, node->right, breadth, depth);
+    diagram_from_lambda_tree_impl(diagram, node->left, breadth, depth);
+    diagram_from_lambda_tree_impl(diagram, node->right, breadth, depth);
 
     Tree_Node *left_tree = get_leftmost_atom_node(node->left);
     Tree_Node *right_tree = get_leftmost_atom_node(node->right);
