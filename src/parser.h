@@ -17,7 +17,7 @@ typedef struct Tree_Node {
   struct Tree_Node *right;
 
   Lambda_Expr_Kind kind;
-  Nob_String_Builder name; // this is only really needed for debug prints
+  char atom; // name of the (bound) atom
   struct Tree_Node *binder; // points to this atom's binder if kind == LAMBDA_ATOM, else NULL
 
   void *user_data;
@@ -32,4 +32,5 @@ bool tree_add_right_child(Tree_Node *node);
 Tree_Node *tree_get_leftmost_node(Tree_Node *node);
 Tree_Node *tree_get_rightmost_node(Tree_Node *node);
 
+void tree_node_label(Nob_String_Builder *sb, Tree_Node *node);
 void tree_print_graphviz(FILE *stream, const Tree_Node *root, bool include_binders);

@@ -16,13 +16,15 @@ void tree_free(Tree_Node *tree) {
   if (tree == NULL) return;
   if (tree->left != NULL) tree_free(tree->left);
   if (tree->right != NULL) tree_free(tree->right);
-  nob_sb_free(tree->name);
   free(tree);
 }
 
 bool tree_add_left_child(Tree_Node *node) {
   if (node->left != NULL) {
-    fprintf(stderr, "Left child of node " SB_Fmt " already exists.\n", SB_Arg(node->name));
+    Nob_String_Builder sb = {0};
+    tree_node_label(&sb, node);
+    fprintf(stderr, "Left child of node " SB_Fmt " already exists.\n", SB_Arg(sb));
+    nob_sb_free(sb);
     return false;
   }
 
@@ -32,7 +34,10 @@ bool tree_add_left_child(Tree_Node *node) {
 
 bool tree_add_right_child(Tree_Node *node) {
   if (node->right != NULL) {
-    fprintf(stderr, "Right child of node " SB_Fmt " already exists.\n", SB_Arg(node->name));
+    Nob_String_Builder sb = {0};
+    tree_node_label(&sb, node);
+    fprintf(stderr, "Right child of node " SB_Fmt " already exists.\n", SB_Arg(sb));
+    nob_sb_free(sb);
     return false;
   }
 
@@ -58,6 +63,7 @@ Tree_Node *tree_get_rightmost_node(Tree_Node *node) {
   return NULL;
 }
 
+
 bool compute_matching_parens(const char *term, VecIndexPair *pairs);
 bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, size_t l, size_t r,
                                  Tree_Node *node, Tree_Node **variable_table);
@@ -80,11 +86,15 @@ void tree_print_graphviz(FILE *f, const Tree_Node *root, bool include_binders) {
   nob_da_append(&queue, (Tree_Node*)root);
 
   size_t i = 0;
+  Nob_String_Builder sb = {0};
   while (i < queue.count && root != NULL) {
     Tree_Node *node = queue.items[i++];
 
     node->user_data = (void*)i;
-    fprintf(f, "\t%zu [label=\"" SB_Fmt "\"]\n", (size_t)node->user_data, SB_Arg(node->name));
+
+    sb.count = 0;
+    tree_node_label(&sb, node);
+    fprintf(f, "\t%zu [label=\"" SB_Fmt "\"]\n", (size_t)node->user_data, SB_Arg(sb));
 
     if (node->left != NULL) {
       nob_da_append(&queue, node->left);
@@ -115,9 +125,11 @@ void tree_print_graphviz(FILE *f, const Tree_Node *root, bool include_binders) {
       fprintf(f, "\t%zu -- %zu [color=gray]\n", (size_t)node->user_data, (size_t)node->binder->user_data);
     }
   }
-  nob_da_free(queue);
 
   fprintf(f, "}\n");
+
+  nob_da_free(queue);
+  nob_sb_free(sb);
 }
 
 bool compute_matching_parens(const char *term, VecIndexPair *pairs) {
@@ -187,10 +199,10 @@ bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, siz
     }
   }
 
-  nob_da_append_many(&node->name, term + l, len);
   if (len == 1) {
     node->kind = LAMBDA_ATOM;
-    node->binder = variable_table[(size_t)*node->name.items];
+    node->atom = term[l];
+    node->binder = variable_table[(size_t)node->atom];
     assert(node->binder != NULL &&
            "This atom's binder should have been recorded in the variable table before we got to it.");
   } else if (term[l] == 'l') {
@@ -210,8 +222,7 @@ bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, siz
     if (!tree_add_left_child(node)) return false;
     if (!tree_add_right_child(node)) return false;
 
-    // set_name(tree, node->left, term + l + 1, 1);
-    nob_da_append_many(&node->left->name, term + l + 1, 1);
+    node->left->atom = term[l + 1];
 
     // NOTE: This check does not allow to bind the same variable name multiple times in the same bound expression
     // (but in disjoint abstractions).
@@ -220,7 +231,7 @@ bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, siz
     /*   fprintf(stderr, "Variable '" SV_Fmt "' already bound.\n", SV_Arg(node->left->name)); */
     /*   return false; */
     /* } */
-    variable_table[(size_t)*node->left->name.items] = node;
+    variable_table[(size_t)node->left->atom] = node;
 
     if (!tree_parse_lambda_term_impl(paren_pairs, term, l + i + 1, r, node->right, variable_table))
       return false;
@@ -237,3 +248,26 @@ bool tree_parse_lambda_term_impl(VecIndexPair paren_pairs, const char *term, siz
 
   return true;
 }
+
+void tree_node_label(Nob_String_Builder *sb, Tree_Node *node) {
+  switch (node->kind) {
+  case LAMBDA_ATOM:
+    nob_da_append(sb, node->atom);
+    return;
+  case LAMBDA_ABSTRACTION: 
+    nob_da_append(sb, '(');
+    nob_da_append(sb, 'l');
+    tree_node_label(sb, node->left);
+    nob_da_append(sb, '.');
+    tree_node_label(sb, node->right);
+    nob_da_append(sb, ')');
+    return;
+  case LAMBDA_APPLICATION:
+    nob_da_append(sb, '(');
+    tree_node_label(sb, node->left);
+    tree_node_label(sb, node->right);
+    nob_da_append(sb, ')');
+    return;
+  }
+}
+

@@ -33,17 +33,25 @@ bool tree_copy_subtree_to_node(Tree_Node *dst, Tree_Node *src) {
   Vec(Node_Pair) stack = {0};
   nob_da_append(&stack, ((Node_Pair){.dst = dst, .src = src}));
 
+  Tree_Node *binder_lookup[256] = {0};
   while (stack.count > 0) {
     Node_Pair curr = stack.items[--stack.count];
 
+    if (curr.src->kind == LAMBDA_ABSTRACTION) {
+      Nob_String_Builder sb = {0};
+      tree_node_label(&sb, curr.src);
+      printf("binder_lookup[%c] = "SB_Fmt"\n", curr.src->left->atom, SB_Arg(sb));
+      nob_sb_free(sb);
+
+      binder_lookup[(size_t)curr.src->left->atom] = curr.dst;
+    };
+
+
     // this is a copy
     curr.dst->kind      = curr.src->kind;
-    curr.dst->binder    = curr.src->binder;
+    curr.dst->binder    = curr.src->kind == LAMBDA_ATOM ? binder_lookup[(size_t)curr.src->atom] : 0;
+    curr.dst->atom      = curr.src->atom;
     curr.dst->user_data = curr.src->user_data;
-
-    curr.dst->name.count = 0;
-    nob_da_append_many(&curr.dst->name, curr.src->name.items, curr.src->name.count);
-
 
     if (curr.src->left != NULL) {
       if (!tree_add_left_child(curr.dst)) return false;
@@ -61,8 +69,10 @@ bool tree_copy_subtree_to_node(Tree_Node *dst, Tree_Node *src) {
   return true;
 }
 
-bool beta_reduce(Tree_Node *node) {
+bool beta_reduce(Tree_Node *node, bool *reducible) {
   Vec(Tree_Node*) stack = {0};
+  Vec(Tree_Node*) atoms = {0};
+
   nob_da_append(&stack, node);
   while (stack.count > 0
          && !(node->kind == LAMBDA_APPLICATION
@@ -74,7 +84,12 @@ bool beta_reduce(Tree_Node *node) {
   }
   stack.count = 0;
 
-  Vec(Tree_Node*) atoms = {0};
+  if (node == NULL || node->kind == LAMBDA_ATOM) {
+    *reducible = false;
+    goto done;
+  }
+
+  *reducible = true;
   nob_da_append(&stack, node->left);
   while (stack.count > 0) {
     Tree_Node *curr = stack.items[--stack.count];
@@ -90,7 +105,14 @@ bool beta_reduce(Tree_Node *node) {
 
   nob_da_foreach(Tree_Node*, atom, &atoms) {
     if (*atom == node->left->left) continue;
-    printf("COPY "SB_Fmt" to "SB_Fmt"\n", SB_Arg(node->right->name), SB_Arg((*atom)->name));
+
+    Nob_String_Builder sb = {0};
+    tree_node_label(&sb, node->right);
+    printf("COPY "SB_Fmt" to ", SB_Arg(sb));
+    sb.count = 0;
+    tree_node_label(&sb, node);
+    printf(SB_Fmt"\n", SB_Arg(sb));
+
     if (!tree_copy_subtree_to_node(*atom, node->right)) return false;
   }
 
@@ -99,39 +121,40 @@ bool beta_reduce(Tree_Node *node) {
 
   Tree_Node *new_node = node->left->right;
   if (node->left != NULL) free(node->left);
-  nob_sb_free(node->name);
   *node = *new_node;
 
+done:
   nob_da_free(stack);
   nob_da_free(atoms);
-
   return true;
 }
 
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
-  /* const char *term = "lf.lx.f(f(f(f(f(fx)))))"; */
-  // const char *term = "(lx.xxx)(lx.ly.xy)";
-  const char *term = "(lf.lg.lx.(ly.y)x)(lz.z)";
-  /* const char *term = "ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x)"; */
-  /* const char *term = "ln.lf.n(lc.la.lb.cb(lx.a(bx)))(lx.ly.x)(lx.x)f"; */
+  // const char *term = "lf.lx.f(f(f(f(f(fx)))))";
+  // const char *term = "(lx.xxx)(ly.y)";
+  // const char *term = "(lf.lg.lx.(ly.y)x)(lz.z)";
+  // const char *term = "ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x)";
+  // const char *term = "ln.lf.n(lc.la.lb.cb(lx.a(bx)))(lx.ly.x)(lx.x)f";
   // const char *term = "ln.lf.lx.n(lg.lh.h(gf))(lu.x)(lu.u)";
-  /* const char *term = "lf.(lx.xx)(lx.f(xx))"; */
-  /* const char *term = "lf.(lx.xx)f"; */
+  // const char *term = "lf.(lx.xx)(lx.f(xx))";
+  const char *term = "lf.(lx.xx)f";
 
   Tree_Node *tree = calloc(1, sizeof(Tree_Node));
   assert(tree != NULL);
   if (!tree_parse_lambda_term(tree, term)) return 1;
 
   tree_print_graphviz(stdout, tree, true);
-  if (!beta_reduce(tree)) return 1;
+  bool reducible;
+  if (!beta_reduce(tree, &reducible)) return 1;
+  if (!reducible) printf("IRREDUCIBLE!\n");
   tree_print_graphviz(stdout, tree, true);
 
 
   // Diagram diagram = {0};
   // diagram_from_lambda_tree(&diagram, tree);
-
+  //
   // SetTraceLogLevel(LOG_ERROR);
   // SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   // InitWindow(800, 600, "Lambda Diagrams");
@@ -148,8 +171,8 @@ int main(int argc, char **argv) {
   // }
   //
   // CloseWindow();
-
-  tree_free(tree);
+  //
   // nob_da_free(diagram);
+  tree_free(tree);
   return 0;
 }
