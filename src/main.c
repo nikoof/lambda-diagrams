@@ -71,15 +71,18 @@ bool tree_copy_subtree_to_node(Tree_Node *dst, Tree_Node *src) {
   return true;
 }
 
-bool beta_reduce(Tree_Node *node, bool *reducible) {
+bool beta_reduce(Tree_Node **nnode, bool *reducible) {
   Vec(Tree_Node*) stack = {0};
   Vec(Tree_Node*) atoms = {0};
 
+  Tree_Node *parent = NULL;
+  Tree_Node *node = *nnode;
   nob_da_append(&stack, node);
   while (stack.count > 0
          && !(node->kind == LAMBDA_APPLICATION
          && node->left != NULL
          && node->left->kind == LAMBDA_ABSTRACTION)) {
+    parent = node;
     node = stack.items[--stack.count];
     if (node->left != NULL) nob_da_append(&stack, node->left);
     if (node->right != NULL) nob_da_append(&stack, node->right);
@@ -127,7 +130,16 @@ bool beta_reduce(Tree_Node *node, bool *reducible) {
 
   Tree_Node *new_node = node->left->right;
   if (node->left != NULL) free(node->left);
-  *node = *new_node;
+  if (parent != NULL) {
+    if (node == parent->left) parent->left = new_node;
+    else if (node == parent->right) parent->right = new_node;
+  } else {
+    // do not do this, instead I need to free node and
+    // point the user's pointer to new_node... cba
+    // *node = *new_node;
+    free(node);
+    *nnode = new_node;
+  }
 
 done:
   nob_da_free(stack);
@@ -139,9 +151,9 @@ int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
   // const char *term = "lf.lx.f(f(f(f(f(fx)))))";
-  const char *term = "ly.(lf.lx.f(f(f(f(f(fx))))))y";
+  // const char *term = "ly.(lf.lx.f(f(f(f(f(fx))))))y";
   // const char *term = "(lx.xx)(lx.xx)";
-  // const char *term = "(ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x))(lf.lx.f(f(f(x))))";
+  const char *term = "(ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x))(lg.ly.g(g(g(y))))";
   // const char *term = "(lf.lg.lx.(ly.y)x)(lz.z)";
   // const char *term = "ln.lf.n(lf.ln.n(f(lf.lx.nf(fx))))(lx.f)(lx.x)";
   // const char *term = "ln.lf.n(lc.la.lb.cb(lx.a(bx)))(lx.ly.x)(lx.x)f";
@@ -175,13 +187,12 @@ int main(int argc, char **argv) {
     EndDrawing();
 
     if (IsKeyPressed(KEY_SPACE)) {
-      if (reducible) { beta_reduce(tree, &reducible); }
+      if (reducible) { beta_reduce(&tree, &reducible); }
       diagram.count = 0;
       tree_print_graphviz(stdout, tree, true);
       diagram_from_lambda_tree(&diagram, tree);
       diagram_to_raylib_texture(texture, diagram, 1, 0.0);
     }
-
   }
 
   CloseWindow();

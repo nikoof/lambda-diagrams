@@ -259,7 +259,7 @@ void tree_node_label(Nob_String_Builder *sb, Tree_Node *node) {
   case LAMBDA_ATOM:
     nob_da_append(sb, node->atom);
     return;
-  case LAMBDA_ABSTRACTION: 
+  case LAMBDA_ABSTRACTION:
     nob_da_append(sb, '(');
     nob_da_append(sb, 'l');
     tree_node_label(sb, node->left);
@@ -274,7 +274,7 @@ void tree_node_label(Nob_String_Builder *sb, Tree_Node *node) {
     nob_da_append(sb, ')');
     return;
   default:
-    expect("enum Lambda_Expr_Kind");
+    fprintf(stderr, "[WARN] prostule, you got garbage in your tree node (this used to be a hard error lmao)\n");
     return;
   }
 }
